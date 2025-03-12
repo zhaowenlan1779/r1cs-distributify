@@ -1,10 +1,10 @@
 use ark_bn254::Fr;
-use circom_compat::{read_witness, R1CSFile};
+use circom_compat::{read_witness, write_witness, R1CSFile};
 use clap::Parser;
 use r1cs_distributify::distribute;
 use rayon::prelude::*;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, BufWriter};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -15,8 +15,12 @@ struct Cli {
     /// JSON witness file (e.g. witness.json)
     witness: String,
 
-    // Number of subprovers
+    /// Number of subprovers
     subprovers: usize,
+
+    /// Output R1CS file and witness (e.g. out.r1cs out.json)
+    #[arg(short, number_of_values = 2)]
+    output: Option<Vec<String>>,
 }
 
 fn check_r1cs_satisfied(r1cs: &R1CSFile<Fr>) {
@@ -81,9 +85,6 @@ fn main() {
     }
     println!("Total num nonzero entries: {:?}", num_nonzero);
 
-    let witness_reader = BufReader::new(File::open("D:/Projects/witness.json").unwrap());
-    file.witness = read_witness::<Fr>(witness_reader);
-
     check_r1cs_satisfied(&file);
     println!("Distributibility: {}", calculate_distributibility(&file, cli.subprovers));
 
@@ -93,4 +94,10 @@ fn main() {
         "Distributibility: {}",
         calculate_distributibility(&new_r1cs, cli.subprovers)
     );
+
+    let out = cli.output.unwrap_or(vec!["out.r1cs".to_string(), "out.json".to_string()]);
+    let mut r1cs_writer = BufWriter::new(File::create(&out[0]).unwrap());
+    new_r1cs.write(&mut r1cs_writer).unwrap();
+    let mut witness_writer = BufWriter::new(File::create(&out[1]).unwrap());
+    write_witness(&new_r1cs.witness, &mut witness_writer).unwrap();
 }

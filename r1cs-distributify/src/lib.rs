@@ -28,6 +28,7 @@ pub fn distribute<F: PrimeField>(r1cs: &R1CSFile<F>, num_subprovers: usize) -> R
     let num_wires_per_subprover = effective_num_wires / num_subprovers;
     let mut subprover_rows = vec![vec![vec![vec![]; 3]; num_wires_per_subprover]; num_subprovers];
     let mut subprover_witnesses = vec![vec![F::one()]; num_subprovers];
+    let mut subprover_wire_mappings = vec![vec![0]; num_subprovers];
 
     // Split the constant column across each subprover
     let chunk_sizes = (0..3)
@@ -72,6 +73,7 @@ pub fn distribute<F: PrimeField>(r1cs: &R1CSFile<F>, num_subprovers: usize) -> R
             subrow[subcol_index][k] = take(&mut rows[k]);
         }
         subprover_witnesses[subprover_id].push(r1cs.witness[*var]);
+        subprover_wire_mappings[subprover_id].push(r1cs.wire_mapping[*var]);
     }
 
     let max_nonzero_count = subprover_rows
@@ -88,6 +90,7 @@ pub fn distribute<F: PrimeField>(r1cs: &R1CSFile<F>, num_subprovers: usize) -> R
 
     let mut new_constraints = vec![(vec![], vec![], vec![]); r1cs.header.n_constraints as usize];
     let mut new_witness = vec![F::zero(); effective_num_wires];
+    let mut new_wire_mapping = vec![0; effective_num_wires];
     for (subprover_id, subprover_row_repr) in subprover_rows.iter().enumerate() {
         for (subwire_id, usages) in subprover_row_repr.iter().enumerate() {
             let wire_id = subprover_id * num_wires_per_subprover + subwire_id;
@@ -103,6 +106,9 @@ pub fn distribute<F: PrimeField>(r1cs: &R1CSFile<F>, num_subprovers: usize) -> R
             new_witness[wire_id] = *subprover_witnesses[subprover_id]
                 .get(subwire_id)
                 .unwrap_or(&F::zero());
+            new_wire_mapping[wire_id] = *subprover_wire_mappings[subprover_id]
+                .get(subwire_id)
+                .unwrap_or(&0);
         }
     }
 
@@ -113,7 +119,7 @@ pub fn distribute<F: PrimeField>(r1cs: &R1CSFile<F>, num_subprovers: usize) -> R
         version: r1cs.version,
         header: new_header,
         constraints: new_constraints,
-        wire_mapping: vec![],
+        wire_mapping: new_wire_mapping,
         witness: new_witness,
     }
 }
