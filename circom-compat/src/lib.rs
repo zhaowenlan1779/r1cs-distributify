@@ -22,7 +22,18 @@ pub struct R1CSFile<F: PrimeField> {
     pub witness: Vec<F>,
 }
 
+
 impl<F: PrimeField> R1CSFile<F> {
+    pub fn new_bn254() -> R1CSFile<F> {
+        Self {
+            version: 1,
+            header: Header::new_bn254(),
+            constraints: vec![],
+            wire_mapping: vec![],
+            witness: vec![],
+        }
+    }
+
     /// reader must implement the Seek trait, for example with a Cursor
     ///
     /// ```rust,ignore
@@ -169,6 +180,20 @@ pub struct Header {
 }
 
 impl Header {
+    fn new_bn254() -> Header {
+        Header {
+            field_size: 32,
+            prime_size: hex::decode("010000f093f5e1439170b97948e833285d588181b64550b829a031e1724e6430")
+                .unwrap(),
+            n_wires: 0,
+            n_pub_out: 0,
+            n_pub_in: 0,
+            n_prv_in: 0,
+            n_labels: 0,
+            n_constraints: 0,
+        }
+    }
+
     fn new<R: Read>(mut reader: R, size: u64) -> IoResult<Header> {
         let field_size = reader.read_u32::<LittleEndian>()?;
         if field_size != 32 {
